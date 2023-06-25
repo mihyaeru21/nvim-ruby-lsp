@@ -1,4 +1,6 @@
+local io = require('io')
 local lspconfig = require('lspconfig')
+local path_util = lspconfig.util.path
 
 -- workaround for textDocument/diagnostic
 -- see https://github.com/Shopify/ruby-lsp/issues/188
@@ -40,13 +42,54 @@ local adapt_to_lsp_diagnostic = function(config)
   end
 end
 
+local file_exists = function(path)
+  local f = io.open(path, "r")
+  if f ~= nil then
+    io.close(f)
+    return true
+  else
+    return false
+  end
+end
+
+local find_root_dir = function(pattern)
+  local current = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
+  if #current == 0 then
+    current = vim.fn.getcwd()
+  end
+  return pattern(path_util.sanitize(current))
+end
+
+local adapt_to_vscode_extension = function(config)
+  local root_dir = find_root_dir(config.root_dir)
+  if not root_dir then return end
+
+  local custom_gemfile_path = path_util.sanitize(path_util.join(root_dir, '.ruby-lsp', 'Gemfile'))
+
+  if file_exists(custom_gemfile_path) then
+    config.cmd_env = {
+      BUNDLE_GEMFILE = custom_gemfile_path,
+      BUNDLE_PATH__SYSTEM = 'true',
+    }
+    config.cmd = { 'bundle', 'exec', 'ruby-lsp' }
+  else
+    config.cmd = function(_dispatch)
+      return nil
+    end
+  end
+end
+
 local M = {}
 
-M.setup = function()
+M.setup = function(ruby_lsp_config)
   lspconfig.util.on_setup = lspconfig.util.add_hook_before(lspconfig.util.on_setup, function(config)
     if config.name ~= 'ruby_ls' then return end
 
     adapt_to_lsp_diagnostic(config)
+
+    if ruby_lsp_config.vscode then
+      adapt_to_vscode_extension(config)
+    end
   end)
 end
 
