@@ -1,6 +1,6 @@
-local io = require('io')
 local lspconfig = require('lspconfig')
-local path_util = lspconfig.util.path
+local util = require('ruby-lsp.util')
+local vscode = require('ruby-lsp.vscode')
 
 -- workaround for textDocument/diagnostic
 -- see https://github.com/Shopify/ruby-lsp/issues/188
@@ -42,41 +42,13 @@ local adapt_to_lsp_diagnostic = function(config)
   end
 end
 
-local file_exists = function(path)
-  local f = io.open(path, "r")
-  if f ~= nil then
-    io.close(f)
-    return true
-  else
-    return false
-  end
-end
-
-local find_root_dir = function(pattern)
-  local current = vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf())
-  if #current == 0 then
-    current = vim.fn.getcwd()
-  end
-  return pattern(path_util.sanitize(current))
-end
-
 local adapt_to_vscode_extension = function(config)
-  local root_dir = find_root_dir(config.root_dir)
+  local root_dir = util.find_root_dir(config.root_dir)
   if not root_dir then return end
 
-  local custom_gemfile_path = path_util.sanitize(path_util.join(root_dir, '.ruby-lsp', 'Gemfile'))
-
-  if file_exists(custom_gemfile_path) then
-    config.cmd_env = {
-      BUNDLE_GEMFILE = custom_gemfile_path,
-      BUNDLE_PATH__SYSTEM = 'true',
-    }
-    config.cmd = { 'bundle', 'exec', 'ruby-lsp' }
-  else
-    config.cmd = function(_dispatch)
-      return nil
-    end
-  end
+  local custom_gemfile_path = vscode.get_custom_gemfile_path(root_dir)
+  config.cmd_env = vscode.get_env(custom_gemfile_path)
+  config.cmd = { 'bundle', 'exec', 'ruby-lsp' }
 end
 
 local M = {}
@@ -91,6 +63,13 @@ M.setup = function(ruby_lsp_config)
       adapt_to_vscode_extension(config)
     end
   end)
+end
+
+M.sync = function()
+  local root_dir = util.find_root_dir(lspconfig.ruby_ls.get_root_dir)
+  if not root_dir then return end
+
+  vscode.sync(root_dir)
 end
 
 return M
