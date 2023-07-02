@@ -35,7 +35,8 @@ M.restart = function()
 end
 
 M.sync = function(root_dir)
-  vim.notify('[Ruby LSP] sync() started.')
+  local title = 'Ruby LSP: sync()'
+  local notify_record = vim.notify('started.', vim.log.levels.INFO, { title = title, timeout = false })
 
   local ruby_lsp_dir = M.get_ruby_lsp_dir(root_dir)
   local custom_gemfile_path = M.get_custom_gemfile_path(root_dir)
@@ -83,11 +84,30 @@ M.sync = function(root_dir)
 
   -- bundle install
   local job_id = vim.fn.jobstart('bundle install', {
-    on_stdout = function(jid, data, event)
+    env = M.get_env(custom_gemfile_path),
+    stderr_buffered = true,
+    on_stderr = function(_jid, data, _event)
+      local msg = vim.fn.join(data, '\n')
+      if msg == '' then return end
+
+      local opts = { title = title, timeout = 10000 }
+      if notify_record then opts.replace = notify_record end
+      notify_record = vim.notify(msg, vim.log.levels.ERROR, opts)
     end,
-    on_exit = function(jid, exit_code, event)
+    on_stdout = function(_jid, data, _event)
+      local msg = vim.fn.join(data, '\n')
+      if msg == '' then return end
+
+      local opts = { title = title, timeout = false }
+      if notify_record then opts.replace = notify_record end
+      notify_record = vim.notify(msg, vim.log.levels.INFO, opts)
+    end,
+    on_exit = function(_jid, exit_code, _event)
+      local opts = { title = title, timeout = 5000 }
+      if notify_record then opts.replace = notify_record end
+
       if exit_code == 0 then
-        vim.notify('[Ruby LSP] sync() succeded.')
+        vim.notify('succeded.', vim.log.levels.INFO, opts)
         M.restart()
       end
     end,
