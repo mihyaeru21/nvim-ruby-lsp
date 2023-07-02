@@ -25,8 +25,18 @@ M.find_root_dir = function(pattern)
   return pattern(path_util.sanitize(current))
 end
 
-M.project_has_dependency = function(gem)
-  return true -- TODO
+--- @param root_dir string
+--- @param gem string regexp escaped string
+M.project_has_dependency = function(root_dir, gem)
+  local path = M.join(root_dir, 'Gemfile')
+  local pattern = '["\']' .. gem .. '["\']'
+
+  for line in io.lines(path) do
+    if string.match(line, pattern) then
+      return true
+    end
+  end
+  return false
 end
 
 M.copy_file = function(src, dest)
