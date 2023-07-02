@@ -2,6 +2,8 @@ local lspconfig = require('lspconfig')
 local util = require('ruby-lsp.util')
 local vscode = require('ruby-lsp.vscode')
 
+local M = {}
+
 -- workaround for textDocument/diagnostic
 -- see https://github.com/Shopify/ruby-lsp/issues/188
 -- It will be unnecessary if textDocument/diagnostic is implemented in Neovim itself.
@@ -49,9 +51,16 @@ local adapt_to_vscode_extension = function(config)
   local custom_gemfile_path = vscode.get_custom_gemfile_path(root_dir)
   config.cmd_env = vscode.get_env(custom_gemfile_path)
   config.cmd = { 'bundle', 'exec', 'ruby-lsp' }
+
+  vim.api.nvim_create_user_command(
+    'RubyLspSync',
+    function()
+      M.sync()
+    end,
+    {}
+  )
 end
 
-local M = {}
 
 M.setup = function(ruby_lsp_config)
   lspconfig.util.on_setup = lspconfig.util.add_hook_before(lspconfig.util.on_setup, function(config)
